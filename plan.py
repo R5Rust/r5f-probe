@@ -44,15 +44,21 @@ if os.path.exists(lt):
             runs.append({'name': p['name'].replace('.', '_').replace('-', '_'), 'ev': [{'t': round(e['t']), 'c': e['c']} for e in p['ev']]})
 
 # --shots: camera poses for render side-by-sides (feet origin, pitch, yaw), HUD and viewmodel hidden, FOV 100 (= R5Rust's)
-SHOTS = []
-for yaw in range(0, 360, 45):
-    SHOTS.append((f'crate_y{yaw}', -10868, 557, 1580, 10, yaw))
-for yaw in (0, 90, 180, 270):
-    SHOTS.append((f'spawn_y{yaw}', -11699, 512, 1577, 0, yaw))
-    SHOTS.append((f'ledge_y{yaw}', -10439, -266, 1580, 15, yaw))
+SHOTS = [tuple(x) for x in json.load(open(os.path.join(HERE, 'poses.json')))]  # examples/posegen.rs
 if '--shots' in sys.argv:
     runs = []
-    pre = ['CMD|cl_fovScale 1.428571', 'CMD|r_drawviewmodel 0', 'CMD|cl_drawhud 0', 'CMD|hud_setting_showHud 0']
+    CVARS = ('mat_autoexposure_compensation mat_autoexposure_max mat_autoexposure_max_luminance mat_autoexposure_max_multiplier '
+             'mat_autoexposure_min mat_autoexposure_min_multiplier mat_autoexposure_speed mat_autoexposure_target_lum_max '
+             'mat_autoexposure_target_lum_min mat_autoexposure_uncap mat_autoexposure_force_value mat_bloom_amount_override mat_bloom_clamp '
+             'mat_bloom_cutoff mat_bloom_global_baseline mat_bloom_streak_amount mat_bloom_streak_clamp mat_bloom_streak_cutoff '
+             'mat_bloom_streak_cutoff_exposure_adapt mat_bloom_streak_exponent_post mat_bloom_streak_exponent_pre mat_bloom_wide_amount '
+             'mat_bloom_wide_clamp mat_bloom_wide_exponent_pre mat_colorcorrection mat_debug_tonemapping mat_debug_tonemapping_disable '
+             'mat_debug_tonemapping_linear_segment_end mat_debug_tonemapping_mid1 mat_debug_tonemapping_mid2 mat_debug_tonemapping_shoulder '
+             'mat_debug_tonemapping_toe mat_dynamic_tonemapping mat_exposure_interaction_override mat_gamma mat_hdr_paper_white_nits '
+             'mat_hdrcolorcorrection mat_local_contrast_edge_scale_override mat_local_contrast_midtone_mask_override '
+             'mat_local_contrast_scale_override mat_local_contrast_vignette_end_override mat_local_contrast_vignette_start_override '
+             'mat_sharpen_amount mat_sharpen_threshold mat_sharpen_width mat_vignette_enable r_exposure fog_enable fog_enableskybox').split()
+    pre = ['DUMP|' + ','.join(CVARS), 'CMD|noclip', 'CMD|cl_fovScale 1.428571', 'CMD|r_drawviewmodel 0', 'CMD|cl_drawhud 0', 'CMD|hud_setting_showHud 0']
     shots = [c for n, x0, y, z, pt, yw in SHOTS for c in (f'CMD|rp look {x0} {y} {z} {pt} {yw}', f'SHOT|{n}')]
     json.dump(SHOTS, open(os.path.join(HERE, 'shots.json'), 'w'))
 setup = [f'fps_max {FPS}', f'rp tp {SPOT[0]} {SPOT[1]} {SPOT[2]} {SPOT[3]}', 'rp info']

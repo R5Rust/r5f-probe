@@ -72,16 +72,21 @@ try {
     "power throttling off: $ok"
     "client pid $($cl.Id); waiting for the plan to finish"
     $deadline = (Get-Date).AddSeconds(600)
-    $shotDir = Join-Path $out 'shots'; $seen = 0
+    $shotDir = Join-Path $out 'shots'; $seen = 0; $cdir = $null
     while ((Get-Date) -lt $deadline) {
-        Start-Sleep 1
+        Start-Sleep -Milliseconds 250
         if ($Shots) {
             # screenshot on every "[RPROBE] shot <name>" the client prints (PrintWindow on its PID, no focus needed)
-            $cdir = Get-ChildItem (Join-Path $Game 'platform\logs\client') -Directory | Where-Object { $_.CreationTime -gt $started } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            # the probe client's own log (another R5F session may be writing logs at the same time)
+            if (-not $cdir) { $cdir = Get-ChildItem (Join-Path $Game 'platform\logs\client') -Directory | Where-Object { $_.CreationTime -gt $started } | Where-Object { Select-String -Path (Join-Path $_.FullName 'script.log') -Pattern '\[RPROBE\] client running' -Quiet -ErrorAction SilentlyContinue } | Select-Object -First 1 }
             if ($cdir) {
                 $hits = @(Select-String -Path (Join-Path $cdir.FullName 'script.log') -Pattern '\[RPROBE\] shot (\S+)' -ErrorAction SilentlyContinue)
                 for ($k = $seen; $k -lt $hits.Count; $k++) {
                     $nm = $hits[$k].Matches[0].Groups[1].Value
+                    $ts = [datetime]::ParseExact($hits[$k].Line.Substring(1, 23), 'yyyy-MM-dd HH:mm:ss.fff', $null)
+                    $lag = ((Get-Date) - $ts).TotalSeconds
+                    if ($lag -gt 9.0) { "shot $nm skipped: log line seen $([math]::Round($lag, 1)) s late"; continue }
+                    "shot $nm (log lag $([math]::Round($lag, 1)) s)"
                     python (Join-Path $here 'snap.py') (Join-Path $shotDir "$nm.png") --pid $cl.Id
                 }
                 $seen = $hits.Count
@@ -92,7 +97,7 @@ try {
         if ($txt -match '\[RPROBE\] done') { break }
     }
     Copy-Item $log (Join-Path $out 'r5f.log') -Force
-    $cdir = Get-ChildItem (Join-Path $Game 'platform\logs\client') -Directory | Where-Object { $_.CreationTime -gt $started } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if (-not $cdir) { $cdir = Get-ChildItem (Join-Path $Game 'platform\logs\client') -Directory | Where-Object { $_.CreationTime -gt $started } | Where-Object { Select-String -Path (Join-Path $_.FullName 'script.log') -Pattern '\[RPROBE\] client running' -Quiet -ErrorAction SilentlyContinue } | Select-Object -First 1 }
     if ($cdir) { Copy-Item (Join-Path $cdir.FullName 'script.log') (Join-Path $out 'r5f_client.log') -Force }
     $n = (Select-String -Path (Join-Path $out 'r5f.log') -Pattern '\[RPROBE\] s ').Count
     "saved out\r5f.log ($n samples)"

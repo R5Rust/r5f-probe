@@ -87,8 +87,8 @@ void function RP_ClientCommand( entity player, array<string> args )
 			player.SnapEyeAngles( < args[4].tofloat(), args[5].tofloat(), 0 > )
 			if ( !IsBitFlagSet( player.GetCinematicEventFlags(), CE_FLAG_HIDE_MAIN_HUD_INSTANT ) )
 			{
-				try { AddCinematicFlag( player, CE_FLAG_HIDE_MAIN_HUD_INSTANT ); AddCinematicFlag( player, CE_FLAG_HIDE_PERMANENT_HUD ) } catch ( e ) { printt( "[RPROBE] hud: " + e ) }
-				try { HolsterAndDisableWeapons( player ) } catch ( e ) { printt( "[RPROBE] holster: " + e ) }
+				try { AddCinematicFlag( player, CE_FLAG_HIDE_MAIN_HUD_INSTANT ); AddCinematicFlag( player, CE_FLAG_HIDE_PERMANENT_HUD ) } catch ( e1 ) { printt( "[RPROBE] hud: " + e1 ) }
+				try { HolsterAndDisableWeapons( player ) } catch ( e2 ) { printt( "[RPROBE] holster: " + e2 ) }
 			}
 			thread function() : ( player )
 			{
@@ -216,6 +216,16 @@ void function RP_Run()
 			RealWait( 0.5 )
 			continue
 		}
+		if ( name == "DUMP" ) // print the live value of every listed convar
+		{
+			foreach ( string cv in split( parts[1], "," ) )
+			{
+				string v = "?"
+				try { v = GetConVarString( cv ) } catch ( e3 ) {}
+				printt( "[RPROBE] cvar " + cv + " = " + v )
+			}
+			continue
+		}
 		if ( name == "SHOT" )
 		{
 			try { FR_DynStats_SetSuppressed( true ) } catch ( e ) {}
@@ -223,7 +233,7 @@ void function RP_Run()
 			entity lp = GetLocalViewPlayer()
 			printt( "[RPROBE] client eye " + string( lp.EyePosition() ) + " ang " + string( lp.EyeAngles() ) + " fovScale " + GetConVarFloat( "cl_fovScale" ) )
 			printt( "[RPROBE] shot " + parts[1] )
-			RealWait( 1.0 )
+			RealWait( 10.0 ) // the game flushes script.log every few seconds, so the watcher sees this line late: hold the pose
 			continue
 		}
 		Cmd( "rp reset" )
