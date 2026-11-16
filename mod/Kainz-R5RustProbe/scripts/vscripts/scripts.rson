@@ -1,0 +1,12 @@
+When: "SERVER"
+Scripts:
+[
+	kainz_r5rustprobe/rp_main.gnut
+]
+
+When: "CLIENT"
+Scripts:
+[
+	kainz_r5rustprobe/rp_plan.gnut
+	kainz_r5rustprobe/rp_main.gnut
+]

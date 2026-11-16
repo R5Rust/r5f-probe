@@ -1,0 +1,252 @@
+// R5Rust movement probe (copied from the Lurch Trainer's Kainz.LurchTest harness). Only arms on a server started
+// with +hostname r5rust_probe (tools\r5f-probe\run.ps1). The client plays the schedules in rp_plan.gnut with the
+// engine's own +forward/+jump/... commands; the server logs position + velocity every tick.
+
+#if SERVER
+global function CodeCallback_Kainz_R5RustProbe_ModInit
+#endif
+#if CLIENT
+global function ClientCodeCallback_Kainz_R5RustProbe_ModInit
+global function RP_CL_Start
+#endif
+
+void function RP_RegisterRemotes()
+{
+	try { RegisterExternalRemoteFunction_ByRef( "RP_CL_Start", "Kainz.R5RustProbe" ) }
+	catch ( e ) { printt( "[RPROBE] ByRef registration failed: " + e ) }
+}
+
+#if SERVER
+struct
+{
+	bool logging = false
+	string name = ""
+	float t0 = 0.0
+	vector startOrg
+	vector startAng
+} file
+
+void function CodeCallback_Kainz_R5RustProbe_ModInit()
+{
+	RP_RegisterRemotes()
+	if ( GetConVarString( "hostname" ) != "r5rust_probe" )
+		return
+	AddClientCommandCallback( "rp", RP_ClientCommand )
+	AddCallback_OnClientConnected( RP_OnConnected )
+	printt( "[RPROBE] server ready" )
+}
+
+void function RP_OnConnected( entity player )
+{
+	thread function() : ( player )
+	{
+		player.EndSignal( "OnDestroy" )
+		while ( !IsAlive( player ) )
+			wait 0.5
+		wait 8.0
+		printt( "[RPROBE] spawned at " + string( player.GetOrigin() ) + " yaw " + player.EyeAngles().y )
+		Remote_CallFunction_ByRef( player, "RP_CL_Start" )
+	}()
+}
+
+int function RP_Flag( entity player, string what )
+{
+	try
+	{
+		switch ( what )
+		{
+			case "duck": return player.IsCrouched() ? 1 : 0
+			case "trav": return player.IsTraversing() ? 1 : 0
+			case "wall": return player.IsWallRunning() ? 1 : 0
+			case "hang": return player.IsWallHanging() ? 1 : 0
+		}
+	}
+	catch ( e ) {}
+	return -1
+}
+
+void function RP_ClientCommand( entity player, array<string> args )
+{
+	if ( args.len() == 0 )
+		return
+	switch ( args[0] )
+	{
+		case "tp": // rp tp x y z yaw
+			file.startOrg = < args[1].tofloat(), args[2].tofloat(), args[3].tofloat() >
+			file.startAng = < 0, args[4].tofloat(), 0 >
+			// fall through to reset
+		case "reset":
+			player.SetOrigin( file.startOrg )
+			player.SetVelocity( < 0, 0, 0 > )
+			player.SnapEyeAngles( file.startAng )
+			player.SetHealth( player.GetMaxHealth() )
+			break
+		case "look": // rp look x y z pitch yaw (for screenshots)
+			player.SetOrigin( < args[1].tofloat(), args[2].tofloat(), args[3].tofloat() > )
+			player.SetVelocity( < 0, 0, 0 > )
+			player.SnapEyeAngles( < args[4].tofloat(), args[5].tofloat(), 0 > )
+			if ( !IsBitFlagSet( player.GetCinematicEventFlags(), CE_FLAG_HIDE_MAIN_HUD_INSTANT ) )
+			{
+				try { AddCinematicFlag( player, CE_FLAG_HIDE_MAIN_HUD_INSTANT ); AddCinematicFlag( player, CE_FLAG_HIDE_PERMANENT_HUD ) } catch ( e ) { printt( "[RPROBE] hud: " + e ) }
+				try { HolsterAndDisableWeapons( player ) } catch ( e ) { printt( "[RPROBE] holster: " + e ) }
+			}
+			thread function() : ( player )
+			{
+				wait 0.5
+				printt( "[RPROBE] look at " + string( player.GetOrigin() ) + " eye " + string( player.EyePosition() ) + " ang " + string( player.EyeAngles() ) )
+			}()
+			break
+		case "info":
+			string w = "none"
+			try { entity aw = player.GetActiveWeapon( eActiveInventorySlot.mainHand ); if ( IsValid( aw ) ) w = aw.GetWeaponClassName() } catch ( e ) {}
+			printt( "[RPROBE] info weapon " + w + " origin " + string( player.GetOrigin() ) + " hull " + string( player.GetPlayerMins() ) + string( player.GetPlayerMaxs() ) )
+			break
+		case "mark":
+			file.name = args.len() > 1 ? args[1] : "run"
+			file.t0 = Time()
+			if ( !file.logging )
+			{
+				file.logging = true
+				thread RP_Log( player )
+			}
+			printt( "[RPROBE] mark " + file.name )
+			break
+		case "end":
+			file.logging = false
+			printt( "[RPROBE] end " + file.name )
+			break
+		case "done":
+			printt( "[RPROBE] done" )
+			break
+	}
+}
+
+void function RP_Log( entity player )
+{
+	player.EndSignal( "OnDestroy" )
+	while ( file.logging )
+	{
+		vector o = player.GetOrigin()
+		vector v = player.GetVelocity()
+		vector a = player.EyeAngles()
+		int slide = 0
+		try { slide = player.IsSliding() ? 1 : 0 } catch ( e ) {}
+		printt( format( "[RPROBE] s %s %.4f %.3f %.3f %.3f %.3f %.3f %.3f %d %d %d %d %d %d %.2f", file.name, Time() - file.t0,
+			o.x, o.y, o.z, v.x, v.y, v.z, player.IsOnGround() ? 1 : 0, slide, RP_Flag( player, "duck" ), RP_Flag( player, "trav" ),
+			RP_Flag( player, "wall" ), RP_Flag( player, "hang" ), a.y ) )
+		WaitFrame()
+	}
+}
+#endif
+
+#if CLIENT
+void function ClientCodeCallback_Kainz_R5RustProbe_ModInit()
+{
+	RP_RegisterRemotes()
+}
+
+void function RP_CL_Start()
+{
+	thread RP_Run()
+}
+
+// client-side per-frame log: the S21 client's own movement prediction, one sample per usercmd at fps_max
+bool clLogging = false
+void function RP_ClientLog( string name )
+{
+	clLogging = true
+	entity p = GetLocalViewPlayer()
+	float t0 = PlatformTime()
+	while ( clLogging )
+	{
+		vector o = p.GetOrigin()
+		vector v = p.GetVelocity()
+		printt( format( "[RPROBE] c %s %.4f %.3f %.3f %.3f %.3f %.3f %.3f %d %.2f", name, PlatformTime() - t0, o.x, o.y, o.z, v.x, v.y, v.z,
+			p.IsOnGround() ? 1 : 0, p.EyeAngles().y ) )
+		WaitFrame()
+	}
+}
+
+void function Cmd( string c )
+{
+	GetLocalClientPlayer().ClientCommand( c )
+}
+
+void function RealWait( float seconds )
+{
+	float until = PlatformTime() + seconds
+	while ( PlatformTime() < until )
+		WaitFrame()
+}
+
+void function Settle()
+{
+	entity p = GetLocalClientPlayer()
+	float until = PlatformTime() + 6.0
+	while ( PlatformTime() < until && ( !p.IsOnGround() || Length( p.GetVelocity() ) > 1.0 ) )
+		WaitFrame()
+	RealWait( 0.4 )
+}
+
+// a wheel flick: one +x/-x pair per frame, like a mouse wheel bound to the command
+void function Spam( string what, int n )
+{
+	for ( int i = 0; i < n; i++ )
+	{
+		Cmd( "+" + what )
+		WaitFrame()
+		Cmd( "-" + what )
+		WaitFrame()
+	}
+}
+
+void function RP_Run()
+{
+	printt( "[RPROBE] client running" )
+	foreach ( string c in RP_Setup() )
+		Cmd( c )
+	RealWait( 1.0 )
+	foreach ( string spec in RP_Plan() )
+	{
+		array<string> parts = split( spec, "|" )
+		string name = parts[0]
+		if ( name == "CMD" )
+		{
+			Cmd( parts[1] )
+			RealWait( 0.5 )
+			continue
+		}
+		if ( name == "SHOT" )
+		{
+			try { FR_DynStats_SetSuppressed( true ) } catch ( e ) {}
+			RealWait( 1.5 )
+			entity lp = GetLocalViewPlayer()
+			printt( "[RPROBE] client eye " + string( lp.EyePosition() ) + " ang " + string( lp.EyeAngles() ) + " fovScale " + GetConVarFloat( "cl_fovScale" ) )
+			printt( "[RPROBE] shot " + parts[1] )
+			RealWait( 1.0 )
+			continue
+		}
+		Cmd( "rp reset" )
+		RealWait( 0.3 )
+		Settle()
+		array<string> evs = split( parts[1], ";" )
+		float start = PlatformTime()
+		foreach ( string ev in evs )
+		{
+			array<string> fld = split( ev, ":" )
+			float t = fld[0].tofloat() / 1000.0
+			while ( PlatformTime() < start + t )
+				WaitFrame()
+			string c = fld[1]
+			if ( c == "MARK" ) { Cmd( "rp mark " + name ); thread RP_ClientLog( name ) }
+			else if ( c == "END" ) { Cmd( "rp end" ); clLogging = false }
+			else if ( c == "TAP" ) thread Spam( "forward", fld[2].tointeger() )
+			else if ( c == "JUMP" ) thread Spam( "jump", fld[2].tointeger() )
+			else Cmd( c )
+		}
+		RealWait( 0.3 )
+	}
+	Cmd( "rp done" )
+	printt( "[RPROBE] client done" )
+}
+#endif

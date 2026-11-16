@@ -1,0 +1,9 @@
+"mod"
+{
+	"author"		"Kainz"
+	"name"			"R5Rust movement probe"
+	"id"			"Kainz.R5RustProbe"
+	"description"	"Plays scripted input schedules through the real movement code and logs position/velocity every server tick, for comparing R5Rust against the real game. Arms only on +hostname r5rust_probe."
+	"version"		"0.1.0"
+	"realm"			"both"
+}
