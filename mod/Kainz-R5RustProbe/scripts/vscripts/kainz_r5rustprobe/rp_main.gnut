@@ -167,8 +167,11 @@ void function RP_ClientLog( string name )
 	}
 }
 
+// The S21 client has no +back/-back command (it is +backward); plans written with Source names would press nothing
 void function Cmd( string c )
 {
+	if ( c == "+back" || c == "-back" )
+		c = c + "ward"
 	GetLocalClientPlayer().ClientCommand( c )
 }
 
@@ -203,6 +206,7 @@ void function Spam( string what, int n )
 void function RP_Run()
 {
 	printt( "[RPROBE] client running" )
+	printt( "[RPROBE] backward-fix" ) // probecmp: +back really presses back in this log
 	foreach ( string c in RP_Setup() )
 		Cmd( c )
 	RealWait( 1.0 )
@@ -250,8 +254,8 @@ void function RP_Run()
 			string c = fld[1]
 			if ( c == "MARK" ) { Cmd( "rp mark " + name ); thread RP_ClientLog( name ) }
 			else if ( c == "END" ) { Cmd( "rp end" ); clLogging = false }
-			else if ( c == "TAP" ) thread Spam( "forward", fld[2].tointeger() )
-			else if ( c == "JUMP" ) thread Spam( "jump", fld[2].tointeger() )
+			else if ( c == "TAP" ) thread Spam( "forward", fld.len() > 2 ? fld[2].tointeger() : 1 )
+			else if ( c == "JUMP" ) thread Spam( "jump", fld.len() > 2 ? fld[2].tointeger() : 1 )
 			else Cmd( c )
 		}
 		RealWait( 0.3 )
