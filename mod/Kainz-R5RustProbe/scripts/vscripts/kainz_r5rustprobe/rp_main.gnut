@@ -96,10 +96,17 @@ void function RP_ClientCommand( entity player, array<string> args )
 				printt( "[RPROBE] look at " + string( player.GetOrigin() ) + " eye " + string( player.EyePosition() ) + " ang " + string( player.EyeAngles() ) )
 			}()
 			break
+		case "legend": // rp legend character_octane (Flowstate's movement-recorder legend swap)
+			try { MRec_ApplyLegend( player, args.len() > 1 ? args[1] : "character_octane", $"", true ) }
+			catch ( e4 ) { printt( "[RPROBE] legend swap failed: " + e4 ) }
+			printt( "[RPROBE] legend " + ( args.len() > 1 ? args[1] : "" ) )
+			break
 		case "info":
 			string w = "none"
 			try { entity aw = player.GetActiveWeapon( eActiveInventorySlot.mainHand ); if ( IsValid( aw ) ) w = aw.GetWeaponClassName() } catch ( e ) {}
-			printt( "[RPROBE] info weapon " + w + " origin " + string( player.GetOrigin() ) + " hull " + string( player.GetPlayerMins() ) + string( player.GetPlayerMaxs() ) )
+			string setfile = "?"
+			try { setfile = string( player.GetPlayerSettings() ) } catch ( e5 ) {}
+			printt( "[RPROBE] info setfile " + setfile + " weapon " + w + " origin " + string( player.GetOrigin() ) + " hull " + string( player.GetPlayerMins() ) + string( player.GetPlayerMaxs() ) )
 			break
 		case "mark":
 			file.name = args.len() > 1 ? args[1] : "run"
