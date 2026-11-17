@@ -68,7 +68,7 @@ try {
 '@
     $h = [R5P.Native]::OpenProcess(0x0200, $false, $cl.Id)   # PROCESS_SET_INFORMATION
     $ok = [R5P.Native]::SetProcessInformation($h, 4, @(1, 1, 0), 12)   # ProcessPowerThrottling: version 1, EXECUTION_SPEED off
-    try { $cl.PriorityClass = 'AboveNormal' } catch {}
+    try { $cl.PriorityClass = 'High' } catch {}
     "power throttling off: $ok"
     "client pid $($cl.Id); waiting for the plan to finish"
     $deadline = (Get-Date).AddSeconds(600)
