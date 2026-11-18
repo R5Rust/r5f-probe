@@ -164,12 +164,16 @@ void function RP_ClientLog( string name )
 	clLogging = true
 	entity p = GetLocalViewPlayer()
 	float t0 = PlatformTime()
+	float c0 = Time()
 	while ( clLogging )
 	{
 		vector o = p.GetOrigin()
 		vector v = p.GetVelocity()
-		printt( format( "[RPROBE] c %s %.4f %.3f %.3f %.3f %.3f %.3f %.3f %d %.2f", name, PlatformTime() - t0, o.x, o.y, o.z, v.x, v.y, v.z,
-			p.IsOnGround() ? 1 : 0, p.EyeAngles().y ) )
+		int fl = 0
+		try { fl = ( p.IsSliding() ? 1 : 0 ) | ( p.IsCrouched() ? 2 : 0 ) | ( p.IsTraversing() ? 4 : 0 ) | ( p.IsWallRunning() ? 8 : 0 ) } catch ( e ) {}
+		// last column: the client's game clock (curtime), which advances by each usercmd's frametime
+		printt( format( "[RPROBE] c %s %.4f %.3f %.3f %.3f %.3f %.3f %.3f %d %.2f %d %.2f %.5f", name, PlatformTime() - t0, o.x, o.y, o.z, v.x, v.y, v.z,
+			p.IsOnGround() ? 1 : 0, p.EyeAngles().y, fl, p.EyeAngles().x, Time() - c0 ) )
 		WaitFrame()
 	}
 }
@@ -247,9 +251,26 @@ void function RP_Run()
 			RealWait( 10.0 ) // the game flushes script.log every few seconds, so the watcher sees this line late: hold the pose
 			continue
 		}
-		Cmd( "rp reset" )
-		RealWait( 0.3 )
-		Settle()
+		// teleport to the run's spot and wait until standing still on the ground near it; a reset that did not take
+		// (the player stayed where the last run ended) is retried
+		string spot = parts.len() > 2 ? parts[2] : ""
+		for ( int tries = 0; tries < 4; tries++ )
+		{
+			Cmd( spot != "" ? "rp tp " + spot : "rp reset" )
+			RealWait( 0.3 )
+			Settle()
+			if ( spot == "" )
+				break
+			array<string> sp = split( spot, " " )
+			vector o = GetLocalClientPlayer().GetOrigin()
+			float dx = o.x - sp[0].tofloat()
+			float dy = o.y - sp[1].tofloat()
+			if ( dx * dx + dy * dy < 16.0 && GetLocalClientPlayer().IsOnGround() )
+				break
+			printt( "[RPROBE] reset retry " + name + " at " + string( o ) )
+		}
+		entity sp0 = GetLocalClientPlayer()
+		printt( "[RPROBE] start " + name + " " + string( sp0.GetOrigin() ) + " yaw " + sp0.EyeAngles().y )
 		array<string> evs = split( parts[1], ";" )
 		float start = PlatformTime()
 		foreach ( string ev in evs )

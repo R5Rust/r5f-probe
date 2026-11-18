@@ -1,6 +1,6 @@
 """Screenshot the Apex client window (copied from apex\r5-tas\tools\snap.py).
 
-    python tools/snap.py build/shots/x.png [--pid N] [--fg]
+    python tools/snap.py build/shots/x.png --pid N [--fg]   (N = the probe client's PID; never a title match)
 
 Default: PrintWindow(PW_RENDERFULLCONTENT). --fg puts the window on top and copies the
 screen instead (for when the D3D12 swapchain never reaches the window DC -> black).
@@ -18,7 +18,11 @@ g32 = ctypes.windll.gdi32
 u32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
 
 
-def find_window(pid=None):
+def find_window(pid):
+    """the largest visible window of the given process (the client run.ps1 launched). Never match by title: the
+    retail Apex client has the same "Apex Legends" title and runs anti-cheat."""
+    if not pid:
+        raise SystemExit("--pid is required (the probe's own client PID)")
     found = []
 
     @ctypes.WINFUNCTYPE(wt.BOOL, wt.HWND, wt.LPARAM)
@@ -27,9 +31,7 @@ def find_window(pid=None):
             return True
         p = wt.DWORD()
         u32.GetWindowThreadProcessId(h, ctypes.byref(p))
-        buf = ctypes.create_unicode_buffer(256)
-        u32.GetWindowTextW(h, buf, 256)
-        if (pid and p.value == pid) or (not pid and buf.value == "Apex Legends"):
+        if p.value == pid:
             r = wt.RECT()
             u32.GetWindowRect(h, ctypes.byref(r))
             found.append((h, (r.right - r.left) * (r.bottom - r.top)))
@@ -82,7 +84,7 @@ def screen_grab(h):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
-    ap.add_argument("--pid", type=int)
+    ap.add_argument("--pid", type=int, required=True)
     ap.add_argument("--fg", action="store_true")
     a = ap.parse_args()
     h = find_window(a.pid)
