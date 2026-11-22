@@ -4,7 +4,9 @@
 # run and removed afterwards. Launch recipe copied from apex\lurch-trainer\r5test\run.ps1.
 #   .\tools\r5f-probe\run.ps1            run everything, then compare: cargo run --release -p shared --example probecmp
 #   .\tools\r5f-probe\run.ps1 -Stop      kill a stuck run
-param([string]$Game = "$env:USERPROFILE\Games\R5Flowstate", [int]$Port = 37121, [int]$TickRate = 60, [switch]$Stop, [switch]$KeepMod, [switch]$Shots)
+# Default game: r5-modkit's test copy (stock S21 exe + paks, but r5-modkit's client/server.dll). The stock S21 install
+# was removed 2026-11-20; movement is the exe's code, SDK hooks (mantle boost) are the modkit build's.
+param([string]$Game = "$env:USERPROFILE\Games\R5Flowstate-modkit-test",[int]$Port = 37121, [int]$TickRate = 60, [switch]$Stop, [switch]$KeepMod, [switch]$Shots)
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 $out = Join-Path $here 'out'; New-Item -ItemType Directory -Force $out | Out-Null
